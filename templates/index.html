@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Aven AI</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+</head>
+
+
+<body oncontextmenu="return false">
+
+
+<div class="sidebar">
+
+
+<h2>Aven AI</h2>
+
+
+<button onclick="newChat()" class="new-chat">
+
++ New Chat
+
+</button>
+
+
+
+<div class="history">
+
+
+<div class="chat-item" onclick="loadTodayChat()">
+
+📅 Today's Chat
+
+</div>
+
+
+
+<div class="chat-item">
+
+🐍 Python Help
+
+</div>
+
+
+
+<div class="chat-item">
+
+💻 Coding
+
+</div>
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+<div class="main">
+
+
+
+<div class="topbar">
+
+
+<h1>Aven AI</h1>
+
+<p>Your Personal AI Assistant</p>
+
+
+</div>
+
+
+
+
+
+<div id="chatbox"></div>
+
+
+
+
+
+<div class="input-area">
+
+
+<input
+
+type="text"
+
+id="message"
+
+placeholder="Message Aven AI..."
+
+autocomplete="off">
+
+
+
+<button onclick="voiceInput()">
+
+🎤
+
+</button>
+<div id="voice-status">
+🎤 Click microphone and speak...
+</div>
+
+
+
+
+<button onclick="send()">
+
+➜
+
+</button>
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<script>
+
+
+// Send Message
+
+async function send(){
+
+
+let input = document.getElementById("message");
+
+
+let text = input.value.trim();
+
+
+
+if(text==="") return;
+
+
+
+let chat = document.getElementById("chatbox");
+
+
+
+chat.innerHTML += `
+
+<div class="user">
+
+${escapeHTML(text)}
+
+</div>
+
+`;
+
+
+
+input.value="";
+
+
+
+chat.innerHTML += `
+
+<div class="bot loading" id="loading">
+
+Aven is thinking...
+
+</div>
+
+`;
+
+
+
+chat.scrollTop = chat.scrollHeight;
+
+
+
+try{
+
+
+let response = await fetch("/chat",{
+
+
+method:"POST",
+
+
+headers:{
+
+
+"Content-Type":"application/json"
+
+},
+
+
+body:JSON.stringify({
+
+message:text
+
+})
+
+
+});
+
+
+
+let data = await response.json();
+
+
+
+document.getElementById("loading").remove();
+
+
+
+
+chat.innerHTML += `
+
+<div class="bot">
+
+${escapeHTML(data.reply)}
+
+</div>
+
+`;
+
+
+
+}
+
+
+
+catch(error){
+
+
+document.getElementById("loading").innerHTML =
+
+"❌ Connection error";
+
+
+}
+
+
+
+chat.scrollTop = chat.scrollHeight;
+
+
+input.focus();
+
+
+}
+
+
+
+
+
+
+
+
+// Enter key send
+
+document
+.getElementById("message")
+.addEventListener("keypress",function(e){
+
+
+if(e.key==="Enter"){
+
+send();
+
+}
+
+
+});
+
+
+
+
+
+
+
+
+// Load database chat on opening
+
+window.onload=function(){
+
+loadTodayChat();
+
+};
+
+
+
+
+
+
+
+
+
+// New Chat
+
+async function newChat(){
+
+
+await fetch("/new_chat");
+
+
+document.getElementById("chatbox").innerHTML="";
+
+
+}
+
+
+
+
+
+
+
+
+
+// Load Chat History from SQLite
+
+async function loadTodayChat(){
+
+
+
+let chat=document.getElementById("chatbox");
+
+
+chat.innerHTML="";
+
+
+
+let response = await fetch("/history");
+
+
+let chats = await response.json();
+
+
+
+
+if(chats.length===0){
+
+
+chat.innerHTML = `
+
+<div class="bot">
+
+No previous chats. Start chatting with Aven AI 🚀
+
+</div>
+
+`;
+
+return;
+
+}
+
+
+
+
+
+chats.forEach(item=>{
+
+
+chat.innerHTML += `
+
+
+<div class="user">
+
+${escapeHTML(item.user)}
+
+</div>
+
+
+
+<div class="bot">
+
+${escapeHTML(item.bot)}
+
+</div>
+
+
+
+`;
+
+
+
+});
+
+
+
+chat.scrollTop = chat.scrollHeight;
+
+
+
+}
+
+
+
+
+
+
+
+
+
+// Voice Input
+function voiceInput(){
+
+
+if(!('webkitSpeechRecognition' in window)){
+
+
+alert("Please use Google Chrome for voice input");
+
+
+return;
+
+}
+
+
+
+let recognition = new webkitSpeechRecognition();
+
+
+let status = document.getElementById("voice-status");
+
+
+
+recognition.lang="en-US";
+
+
+recognition.continuous=false;
+
+
+recognition.interimResults=false;
+
+
+
+recognition.start();
+
+
+
+// When microphone starts
+
+recognition.onstart=function(){
+
+
+status.innerHTML="🔴 Aven is listening... Speak now";
+
+
+status.classList.add("listening");
+
+
+};
+
+
+
+
+// When speech is detected
+
+recognition.onresult=function(event){
+
+
+let text = event.results[0][0].transcript;
+
+
+document.getElementById("message").value=text;
+
+
+status.innerHTML="✅ Voice captured";
+
+
+};
+
+
+
+
+// When finished
+
+recognition.onend=function(){
+
+
+setTimeout(()=>{
+
+
+status.classList.remove("listening");
+
+
+status.style.display="none";
+
+
+},2000);
+
+
+};
+
+
+
+
+// Error
+
+recognition.onerror=function(event){
+
+
+status.innerHTML="❌ Voice error: "+event.error;
+
+
+status.classList.add("listening");
+
+
+};
+
+
+}
+
+
+
+
+
+
+
+
+
+// Security
+
+function escapeHTML(text){
+
+
+return text
+
+.replace(/&/g,"&amp;")
+
+.replace(/</g,"&lt;")
+
+.replace(/>/g,"&gt;")
+
+.replace(/"/g,"&quot;")
+
+.replace(/'/g,"&#039;");
+
+
+}
+
+
+
+</script>
+
+
+
+</body>
+
+</html>
