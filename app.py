@@ -1,226 +1,133 @@
 from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from google import genai
 from dotenv import load_dotenv
+from groq import Groq
 import os
 
-
+# Load environment variables
 load_dotenv()
-
 
 app = Flask(__name__)
 
-
 # Database setup
-
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///aven_chat.db"
-
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
 
 db = SQLAlchemy(app)
 
+# Get API Key
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY not found in .env file")
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
-
-
+# Groq Client
+client = Groq(api_key=GROQ_API_KEY)
 
 system_instruction = """
 You are Aven AI.
 
 You were created by Vijay Saradhi.
 
-You are a personal AI assistant for coding,
-learning and productivity.
+You are a helpful, friendly and intelligent AI assistant.
 
-If asked who created you:
-Say:
+You help with:
+- Coding
+- Learning
+- Productivity
+- General knowledge
+
+If someone asks who created you, always reply:
+
 "I was created by Vijay Saradhi. I am Aven AI."
 """
 
-
-
-
-
-# Chat Database Model
+# ---------------- Database ---------------- #
 
 class Chat(db.Model):
-
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
-
-    user_message = db.Column(
-        db.String(500)
-    )
-
-
-    ai_message = db.Column(
-        db.Text
-    )
-
-
-
-
+    id = db.Column(db.Integer, primary_key=True)
+    user_message = db.Column(db.String(500))
+    ai_message = db.Column(db.Text)
 
 with app.app_context():
-
     db.create_all()
 
-
-
-
-
-
+# ---------------- Routes ---------------- #
 
 @app.route("/")
 def home():
-
     return render_template("index.html")
 
 
-
-
-
-
-
-
-@app.route("/chat",methods=["POST"])
+@app.route("/chat", methods=["POST"])
 def chat():
+    data = request.get_json()
 
+    user_text = data.get("message", "").strip()
 
-    data=request.get_json()
+    if not user_text:
+        return jsonify({"reply": "Please enter a message."})
 
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_instruction
+                },
+                {
+                    "role": "user",
+                    "content": user_text
+                }
+            ],
+            temperature=0.7,
+            max_tokens=1024
+        )
 
-    user_text=data["message"]
+        reply = response.choices[0].message.content
 
+    except Exception as e:
+        reply = f"⚠️ Error: {str(e)}"
 
-
-
-    response = client.models.generate_content(
-
-        model="gemini-3.6-flash",
-
-        contents=[
-            {
-                "role":"user",
-                "parts":[
-                    {
-                        "text":system_instruction
-                    }
-                ]
-            },
-            {
-                "role":"user",
-                "parts":[
-                    {
-                        "text":user_text
-                    }
-                ]
-            }
-        ]
-
-    )
-
-
-
-    reply=response.text
-
-
-
-
-    # Save to database
-
-    new_chat = Chat(
-
+    # Save chat
+    chat_data = Chat(
         user_message=user_text,
-
         ai_message=reply
-
     )
 
-
-    db.session.add(new_chat)
-
+    db.session.add(chat_data)
     db.session.commit()
 
-
-
-
-
     return jsonify({
-
-        "reply":reply
-
+        "reply": reply
     })
 
 
-
-
-
-
-
-
-
-# Get Chat History
-
 @app.route("/history")
-
 def history():
+    chats = Chat.query.order_by(Chat.id).all()
 
-
-    chats = Chat.query.all()
-
-
-
-    data=[]
-
+    history = []
 
     for chat in chats:
-
-        data.append({
-
-            "user":chat.user_message,
-
-            "bot":chat.ai_message
-
+        history.append({
+            "user": chat.user_message,
+            "bot": chat.ai_message
         })
 
-
-
-    return jsonify(data)
-
-
-
-
-
+    return jsonify(history)
 
 
 @app.route("/new_chat")
-
 def new_chat():
-
-
     Chat.query.delete()
-
     db.session.commit()
 
-
     return jsonify({
-
-        "status":"deleted"
-
+        "status": "deleted"
     })
 
 
-
-
-
-
-if __name__=="__main__":
-
+if __name__ == "__main__":
     app.run(debug=True)
