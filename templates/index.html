@@ -3,226 +3,763 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Aven AI</title>
 
 <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
 </head>
+
 <body>
 
+
 <div class="sidebar">
-    <h2>Aven AI</h2>
-    <button class="new-chat" onclick="newChat()">+ New Chat</button>
+
+<h2>Aven AI</h2>
+
+<button class="new-chat" onclick="newChat()">
++ New Chat
+</button>
+
 </div>
+
+
+
 
 <div class="main">
 
-    <div class="topbar">
-        <h1>Aven AI</h1>
-        <p>Your Personal AI Assistant</p>
-    </div>
 
-    <div id="chatbox"></div>
+<div class="topbar">
 
-    <div id="voice-status">
-        🎤 Click microphone and speak...
-    </div>
+<h1>Aven AI</h1>
 
-    <div class="input-area">
-        <input id="message" type="text" placeholder="Message Aven AI..." autocomplete="off">
-        <button onclick="voiceInput()">🎤</button>
-        <button onclick="send()">➜</button>
-    </div>
+<p>Your Personal AI Assistant</p>
 
 </div>
 
+
+
+
+<div id="chatbox"></div>
+
+
+
+
+<div id="voice-status">
+🎤 Click microphone and speak...
+</div>
+
+
+
+
+<div class="input-area">
+
+
+<input 
+id="message"
+type="text"
+placeholder="Message Aven AI..."
+autocomplete="off">
+
+
+
+<button onclick="voiceInput()">
+🎤
+</button>
+
+
+
+<button onclick="stopSpeaking()">
+🛑
+</button>
+
+
+
+<button onclick="send()">
+➜
+</button>
+
+
+
+</div>
+
+
+</div>
+
+
+
+
+
 <script>
 
-window.onload = async () => {
-    await newChat();
-    document.getElementById("message").focus();
+
+window.onload = async ()=>{
+
+await newChat();
+
+document.getElementById("message").focus();
+
 };
 
-document.getElementById("message").addEventListener("keypress", function(e){
-    if(e.key==="Enter"){
-        send();
-    }
+
+
+
+
+document.getElementById("message")
+.addEventListener("keypress",function(e){
+
+if(e.key==="Enter"){
+
+send();
+
+}
+
 });
 
+
+
+
+
+
+
 async function newChat(){
-    await fetch("/new_chat");
-    document.getElementById("chatbox").innerHTML="";
+
+await fetch("/new_chat");
+
+document.getElementById("chatbox").innerHTML="";
+
 }
 
+
+
+
+
+
+
 function escapeHTML(text){
-    return text
-        .replace(/&/g,"&amp;")
-        .replace(/</g,"&lt;")
-        .replace(/>/g,"&gt;")
-        .replace(/"/g,"&quot;")
-        .replace(/'/g,"&#039;");
+
+return text
+.replace(/&/g,"&amp;")
+.replace(/</g,"&lt;")
+.replace(/>/g,"&gt;")
+.replace(/"/g,"&quot;")
+.replace(/'/g,"&#039;");
+
 }
+
+
+
+
+
+
+
 
 async function send(){
 
-    const input=document.getElementById("message");
-    const text=input.value.trim();
 
-    if(!text) return;
 
-    const chat=document.getElementById("chatbox");
+// stop old voice
 
-    chat.innerHTML += `
-        <div class="user">${escapeHTML(text)}</div>
-        <div class="bot loading" id="loading">
-            Aven is thinking...
-        </div>
-    `;
+stopSpeaking();
 
-    input.value="";
-    chat.scrollTop=chat.scrollHeight;
 
-    try{
 
-        const response = await fetch("/chat",{
-            method:"POST",
-            headers:{
-                "Content-Type":"application/json"
-            },
-            body:JSON.stringify({
-                message:text
-            })
-        });
+const input=document.getElementById("message");
 
-        const data = await response.json();
+const text=input.value.trim();
 
-        document.getElementById("loading").remove();
 
-        chat.innerHTML += `
-            <div class="bot">${escapeHTML(data.reply)}</div>
-        `;
 
-    }catch(err){
+if(!text)return;
 
-        document.getElementById("loading").innerText="❌ Connection Error";
 
-    }
 
-    chat.scrollTop=chat.scrollHeight;
+const chat=document.getElementById("chatbox");
+
+
+
+chat.innerHTML += `
+
+
+<div class="user">
+
+${escapeHTML(text)}
+
+</div>
+
+
+
+<div class="bot loading" id="loading">
+
+Aven is thinking...
+
+</div>
+
+
+`;
+
+
+
+input.value="";
+
+
+chat.scrollTop=chat.scrollHeight;
+
+
+
+try{
+
+
+const response = await fetch("/chat",{
+
+
+method:"POST",
+
+
+headers:{
+
+"Content-Type":"application/json"
+
+},
+
+
+body:JSON.stringify({
+
+message:text
+
+})
+
+
+});
+
+
+
+const data=await response.json();
+
+
+
+document.getElementById("loading").remove();
+
+
+
+
+chat.innerHTML += `
+
+
+<div class="bot">
+
+${escapeHTML(data.reply)}
+
+</div>
+
+
+`;
+
+
+
+
+// Voice reply
+
+speak(data.reply);
+
+
 
 }
 
 
+
+catch(err){
+
+
+document.getElementById("loading").innerText=
+"❌ Connection Error";
+
+
+}
+
+
+
+chat.scrollTop=chat.scrollHeight;
+
+
+}
+
+
+
+
+
+
+
+
 // ==========================
-// Voice Assistant
+// Aven Voice Reply
 // ==========================
+
+
+
+function speak(text){
+
+
+
+if(!("speechSynthesis" in window)){
+
+return;
+
+}
+
+
+
+
+window.speechSynthesis.cancel();
+
+
+
+
+// Speak only first 20 words
+
+let words=text.split(" ");
+
+
+if(words.length>20){
+
+text=words.slice(0,20).join(" ")+"...";
+
+}
+
+
+
+
+let speech =
+new SpeechSynthesisUtterance(text);
+
+
+
+speech.lang="en-US";
+
+
+speech.rate=0.95;
+
+
+speech.pitch=0.75;
+
+
+speech.volume=1;
+
+
+
+
+
+let voices =
+window.speechSynthesis.getVoices();
+
+
+
+
+// Prefer male voices
+
+
+let maleVoice = voices.find(v =>
+
+v.name.toLowerCase().includes("male")
+
+);
+
+
+
+
+if(!maleVoice){
+
+
+maleVoice = voices.find(v =>
+
+v.name.includes("Microsoft David")
+
+);
+
+
+}
+
+
+
+if(!maleVoice){
+
+
+maleVoice = voices.find(v =>
+
+v.name.includes("Microsoft Mark")
+
+);
+
+
+}
+
+
+
+if(maleVoice){
+
+speech.voice=maleVoice;
+
+}
+
+
+
+window.speechSynthesis.speak(speech);
+
+
+}
+
+
+
+
+
+
+
+// Stop Voice
+
+
+function stopSpeaking(){
+
+
+if("speechSynthesis" in window){
+
+window.speechSynthesis.cancel();
+
+}
+
+
+}
+
+
+
+
+
+
+
+
+
+// ==========================
+// Voice Input
+// ==========================
+
+
 
 function voiceInput(){
 
-    if(!("webkitSpeechRecognition" in window)){
-        alert("Please use Google Chrome.");
-        return;
-    }
 
-    const recognition = new webkitSpeechRecognition();
 
-    recognition.lang="en-US";
-    recognition.continuous=false;
-    recognition.interimResults=false;
+if(!("webkitSpeechRecognition" in window)){
 
-    const status=document.getElementById("voice-status");
 
-    recognition.onstart=function(){
+alert("Please use Google Chrome");
 
-        status.style.display="block";
-        status.classList.add("listening");
-        status.innerHTML="🔴 Aven is listening...";
 
-    };
+return;
 
-    recognition.onresult=function(event){
 
-        const text=event.results[0][0].transcript.toLowerCase();
+}
 
-        status.innerHTML="✅ "+text;
-const websites = {
-    youtube: "https://www.youtube.com",
-    google: "https://www.google.com",
-    gmail: "https://mail.google.com",
-    chatgpt: "https://chatgpt.com",
-    github: "https://github.com",
-    instagram: "https://www.instagram.com",
-    facebook: "https://www.facebook.com",
-    x: "https://x.com",
-    twitter: "https://x.com",
-    amazon: "https://www.amazon.in",
-    flipkart: "https://www.flipkart.com",
-    netflix: "https://www.netflix.com",
-    linkedin: "https://www.linkedin.com",
-    spotify: "https://open.spotify.com",
-    reddit: "https://www.reddit.com",
-    wikipedia: "https://www.wikipedia.org",
-    irctc: "https://www.irctc.co.in"
+
+
+
+const recognition =
+new webkitSpeechRecognition();
+
+
+
+
+recognition.lang="en-US";
+
+recognition.continuous=false;
+
+recognition.interimResults=false;
+
+
+
+
+const status=
+document.getElementById("voice-status");
+
+
+
+
+
+recognition.onstart=function(){
+
+
+status.style.display="block";
+
+
+status.classList.add("listening");
+
+
+status.innerHTML=
+"🔴 Aven is listening...";
+
+
 };
 
-if (text.startsWith("open ")) {
 
-    let site = text.replace("open ", "").trim().toLowerCase();
 
-    // Open known websites
-    if (websites[site]) {
-        window.open(websites[site], "_blank");
-        return;
-    }
 
-    // User already spoke a domain
-    if (
-        site.endsWith(".com") ||
-        site.endsWith(".in") ||
-        site.endsWith(".org") ||
-        site.endsWith(".net") ||
-        site.endsWith(".co.in")
-    ) {
-        window.open("https://www." + site, "_blank");
-        return;
-    }
 
-    // Default to .com
-    window.open("https://www." + site + ".com", "_blank");
+recognition.onresult=function(event){
+
+const text =
+event.results[0][0]
+.transcript
+.toLowerCase();
+
+
+status.innerHTML="✅ "+text;
+
+
+
+const websites={
+
+youtube:"https://www.youtube.com",
+google:"https://www.google.com",
+gmail:"https://mail.google.com",
+chatgpt:"https://chatgpt.com",
+github:"https://github.com",
+instagram:"https://www.instagram.com",
+facebook:"https://www.facebook.com",
+amazon:"https://www.amazon.in",
+flipkart:"https://www.flipkart.com",
+netflix:"https://www.netflix.com",
+linkedin:"https://www.linkedin.com",
+spotify:"https://open.spotify.com",
+reddit:"https://www.reddit.com",
+wikipedia:"https://www.wikipedia.org",
+irctc:"https://www.irctc.co.in"
+
+};
+
+// ==========================
+// Google Search Command
+// ==========================
+
+if(text.startsWith("search ")){
+
+    let query = text
+    .replace("search ","")
+    .trim();
+
+
+    let googleURL =
+    "https://www.google.com/search?q="
+    + encodeURIComponent(query);
+
+
+
+    speak("Searching for " + query);
+
+
+    setTimeout(()=>{
+
+        window.open(
+            googleURL,
+            "_blank"
+        );
+
+    },1000);
+
+
+
     return;
-}
-
-        document.getElementById("message").value=text;
-
-        send();
-
-    };
-
-    recognition.onerror=function(event){
-
-        status.style.display="block";
-        status.innerHTML="❌ "+event.error;
-
-    };
-
-    recognition.onend=function(){
-
-        setTimeout(function(){
-
-            status.style.display="none";
-            status.classList.remove("listening");
-
-        },1500);
-
-    };
-
-    recognition.start();
 
 }
+
+
+// ==========================
+// Play YouTube Video/Song
+// ==========================
+
+if(
+text.startsWith("play ") ||
+text.startsWith("search youtube for ")
+){
+
+let query;
+
+
+if(text.startsWith("play ")){
+
+query=text.replace("play ","").trim();
+
+}
+else{
+
+query=text.replace("search youtube for ","").trim();
+
+}
+
+
+
+speak("Playing " + query);
+
+
+
+fetch("/youtube",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+query:query
+})
+
+})
+
+.then(res=>res.json())
+
+.then(data=>{
+
+
+window.open(
+data.url,
+"_blank"
+);
+
+
+});
+
+
+return;
+
+}
+
+
+
+
+// ==========================
+// Open Website
+// ==========================
+
+if(text.startsWith("open ")){
+
+let site =
+text.replace("open ","")
+.trim();
+
+
+
+if(websites[site]){
+
+
+speak("Opening " + site);
+
+
+setTimeout(()=>{
+
+window.open(
+websites[site],
+"_blank"
+);
+
+},1000);
+
+
+return;
+
+}
+
+
+
+
+
+if(site.includes(".")){
+
+
+speak("Opening " + site);
+
+
+setTimeout(()=>{
+
+window.open(
+"https://www."+site+".com",
+"_blank"
+);
+
+},1000);
+
+return;
+
+}
+
+
+
+
+window.open(
+"https://www."+site+".com",
+"_blank"
+);
+
+
+return;
+
+
+}
+
+
+
+
+
+
+// Normal Aven Chat
+// Normal Aven Chat
+
+document.getElementById("message").value=text;
+
+send();
+
+
+};
+
+
+
+// Voice Error Handling
+
+recognition.onerror=function(event){
+
+    status.style.display="block";
+
+    status.innerHTML="❌ "+event.error;
+
+};
+
+
+
+// Voice End
+
+recognition.onend=function(){
+
+    setTimeout(()=>{
+
+        status.style.display="none";
+
+        status.classList.remove("listening");
+
+    },1500);
+
+};
+
+
+
+recognition.start();
+
+
+}
+
 
 </script>
 
+
 </body>
+
 </html>
