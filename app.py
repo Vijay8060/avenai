@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 from groq import Groq
+import requests
 import os
 
 # Load environment variables
@@ -119,11 +120,40 @@ def youtube_search():
 
     query = data["query"]
 
-    url = "https://www.youtube.com/results?search_query=" + query.replace(" ", "+")
+
+    api_key = os.getenv("YOUTUBE_API_KEY")
+
+
+    url = "https://www.googleapis.com/youtube/v3/search"
+
+
+    params = {
+        "part":"snippet",
+        "q":query,
+        "type":"video",
+        "maxResults":1,
+        "key":api_key
+    }
+
+
+    response = requests.get(
+        url,
+        params=params
+    )
+
+
+    result=response.json()
+
+
+    video_id=result["items"][0]["id"]["videoId"]
+
+
+    video_url="https://www.youtube.com/watch?v="+video_id
+
 
     return jsonify({
-        "url": url,
-        "title": query
+        "url":video_url,
+        "title":query
     })
 @app.route("/history")
 def history():
