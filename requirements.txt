@@ -3,4 +3,3 @@ Flask-SQLAlchemy
 python-dotenv
 groq
 gunicorn
-youtube-search-python
